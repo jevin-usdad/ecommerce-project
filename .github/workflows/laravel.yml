@@ -1,4 +1,4 @@
-name: Laravel
+name: Laravel CI (Docker)
 
 on:
   push:
@@ -8,28 +8,50 @@ on:
 
 jobs:
   laravel-tests:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: shivammathur/setup-php@15c43e89cdef867065b0213be354c2841860869e
-      with:
-        php-version: '8.0'
-    - uses: actions/checkout@v4
-    - name: Copy .env
-      run: php -r "file_exists('.env') || copy('.env.example', '.env');"
-    - name: Install Dependencies
-      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
-    - name: Generate key
-      run: php artisan key:generate
-    - name: Directory Permissions
-      run: chmod -R 777 storage bootstrap/cache
-    - name: Create Database
-      run: |
-        mkdir -p database
-        touch database/database.sqlite
-    - name: Execute tests (Unit and Feature tests) via PHPUnit/Pest
-      env:
-        DB_CONNECTION: sqlite
-        DB_DATABASE: database/database.sqlite
-      run: php artisan test
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Copy env file
+      - name: Copy .env
+        run: cp .env.example .env
+
+      # 3. Build Docker images
+      - name: Build Docker images
+        run: docker compose build
+
+      # 4. Start containers
+      - name: Start containers
+        run: docker compose up -d
+
+      # 5. Wait for MySQL healthcheck
+      - name: Wait for MySQL
+        run: |
+          until docker compose exec mysql mysqladmin ping -h localhost -proot --silent; do
+            echo "Waiting for MySQL..."
+            sleep 3
+          done
+
+      # 6. Install Composer dependencies
+      - name: Install Composer dependencies
+        run: docker compose exec app composer install --no-interaction --prefer-dist
+
+      # 7. Generate app key
+      - name: Generate app key
+        run: docker compose exec app php artisan key:generate
+
+      # 8. Run migrations
+      - name: Run migrations
+        run: docker compose exec app php artisan migrate --force
+
+      # 9. Run tests
+      - name: Run tests
+        run: docker compose exec app php artisan test
+
+      # 10. Stop containers
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v
