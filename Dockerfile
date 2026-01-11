@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     libonig-dev \
     libxml2-dev \
     default-mysql-client \
+    curl \
     && docker-php-ext-install \
         pdo_mysql \
         zip \
@@ -16,6 +17,9 @@ RUN apt-get update && apt-get install -y \
         exif \
         pcntl \
     && a2enmod rewrite
+
+# Install Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Change Apache DocumentRoot to Laravel public folder
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
